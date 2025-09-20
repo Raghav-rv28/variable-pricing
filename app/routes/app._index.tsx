@@ -141,8 +141,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const variantsToUpdate = product.variants
           .filter((variant: any) => {
             const weight = variant.inventoryItem?.measurement?.weight?.value;
-            const weightUnit = variant.inventoryItem?.measurement?.weight?.unit;
-            return weight && weight > 0 && weightUnit === 'g';
+            return weight && weight > 0;
           })
           .map((variant: any) => {
             const weight = variant.inventoryItem.measurement.weight.value;
@@ -241,12 +240,21 @@ useEffect(() => {
       const totalUpdated = results.reduce((sum: number, r: any) => sum + r.variantsUpdated, 0);
       setMessage(`Successfully updated ${totalUpdated} variants across ${results.length} products.`);
       shopify.toast.show("Prices updated successfully");
+      
+      // Automatically refresh product data to show updated prices
+      if (selectedCollection) {
+        const formData = new FormData();
+        formData.append("actionType", "getProducts");
+        formData.append("collectionId", selectedCollection);
+        formData.append("searchQuery", searchQuery);
+        fetcher.submit(formData, { method: "POST" });
+      }
     }
     if (errors && errors.length > 0) {
       setMessage(`Errors occurred: ${errors.join('; ')}`);
     }
   }
-}, [fetcher.data, shopify]);
+}, [fetcher.data, shopify, selectedCollection, searchQuery]);
 
   const filteredProducts = products.filter(product => {
     if (statusFilter.length > 0 && !statusFilter.includes(product.status.toLowerCase())) {
