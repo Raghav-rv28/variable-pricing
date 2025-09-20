@@ -141,7 +141,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         const variantsToUpdate = product.variants
           .filter((variant: any) => {
             const weight = variant.inventoryItem?.measurement?.weight?.value;
-            return weight && weight > 0;
+            const weightUnit = variant.inventoryItem?.measurement?.weight?.unit;
+            return weight && weight > 0 && weightUnit === 'g';
           })
           .map((variant: any) => {
             const weight = variant.inventoryItem.measurement.weight.value;
@@ -294,11 +295,12 @@ useEffect(() => {
   };
 
   const tableRows = filteredProducts.map(product => {
-    const weightInfo = product.variants
-      .map((v: any) => v.inventoryItem?.measurement?.weight?.value)
-      .filter(Boolean);
-    const avgWeight = weightInfo.length > 0 ? 
-      (weightInfo.reduce((sum: number, w: number) => sum + w, 0) / weightInfo.length).toFixed(2) : 'N/A';
+    const firstVariant = product.variants[0];
+    const firstVariantWeight = firstVariant?.inventoryItem?.measurement?.weight?.value;
+    const firstVariantPrice = firstVariant?.price;
+    
+    const weightDisplay = firstVariantWeight ? `${firstVariantWeight}g` : 'N/A';
+    const priceDisplay = firstVariantPrice ? `$${firstVariantPrice}` : 'N/A';
 
     return [
       <Checkbox
@@ -311,8 +313,8 @@ useEffect(() => {
       product.title,
       product.status,
       product.variants.length.toString(),
-      avgWeight + 'g',
-      product.hasWeight ? 'Yes' : 'No'
+      weightDisplay,
+      priceDisplay
     ];
   });
 
@@ -444,7 +446,7 @@ useEffect(() => {
 
                   <DataTable
                     columnContentTypes={['text', 'text', 'text', 'numeric', 'text', 'text']}
-                    headings={['Select', 'Product Title', 'Status', 'Variants', 'Avg Weight', 'Has Weight']}
+                    headings={['Select', 'Product Title', 'Status', 'Variants', 'First Variant Weight', 'First Variant Price']}
                     rows={tableRows}
                     hoverable
                   />
