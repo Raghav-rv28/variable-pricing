@@ -8,7 +8,7 @@ import {
   Button,
 } from '@shopify/ui-extensions-react/admin';
 import { useState } from 'react';
-import { GET_PRODUCT_VARIANTS, UPDATE_PRODUCT_VARIANT } from './utils/queries';
+import { GET_PRODUCT_VARIANTS, BULK_UPDATE_PRODUCT_VARIANTS } from './utils/queries';
 
 // The target used here must match the target used in the extension's toml file (./shopify.extension.toml)
 const TARGET = 'admin.product-details.block.render';
@@ -47,8 +47,8 @@ function App() {
         return;
       }
 
-      // Calculate new prices and update variants
-      const updates = variants
+      // Calculate new prices and prepare bulk update
+      const variantsToUpdate = variants
         .filter(variant => {
           const weight = variant.inventoryItem?.measurement?.weight?.value;
           return weight && weight > 0;
@@ -56,27 +56,40 @@ function App() {
         .map(variant => {
           const weight = variant.inventoryItem.measurement.weight.value;
           const newPrice = (parseFloat(weight) * parseFloat(multiplier)).toFixed(2);
-          return query(UPDATE_PRODUCT_VARIANT, {
-            variables: {
-              input: {
-                id: variant.id,
-                price: newPrice
-              }
-            }
-          });
+          return {
+            id: variant.id,
+            price: newPrice
+          };
         });
 
-      if (updates.length === 0) {
+      if (variantsToUpdate.length === 0) {
         setMessage('No variants with weight found to update');
         return;
       }
 
-      await Promise.all(updates);
+      // Use bulk update mutation
+      const bulkUpdateResponse = await query(BULK_UPDATE_PRODUCT_VARIANTS, {
+        variables: {
+          productId: productId,
+          variants: variantsToUpdate
+        }
+      });
+
+      const { userErrors } = bulkUpdateResponse.data.productVariantsBulkUpdate;
       
-      if (variants.length === 1) {
-        setMessage('Updated product price successfully!');
+      if (userErrors.length > 0) {
+        setMessage(`Update failed: ${userErrors.map(e => e.message).join(', ')}`);
       } else {
-        setMessage(`Updated ${updates.length} variants successfully!`);
+        if (variants.length === 1) {
+          setMessage('Updated product price successfully! Refreshing page...');
+        } else {
+          setMessage(`Updated ${variantsToUpdate.length} variants successfully! Refreshing page...`);
+        }
+        
+        // Refresh the page after successful update
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       }
       
     } catch (error) {
@@ -86,7 +99,7 @@ function App() {
 
   return (
     <AdminBlock title="Weight Multiplier Block">
-      <BlockStack spacing="base">
+      <BlockStack spacing="base" blockGap gap padding>
         <Text>
           Enter a multiplier to recalculate variant prices based on their weight.
           New price = weight (grams) × multiplier

@@ -24,10 +24,13 @@ export const GET_PRODUCT_VARIANTS = `
   }
 `;
 
-export const UPDATE_PRODUCT_VARIANT = `
-  mutation productVariantUpdate($input: ProductVariantInput!) {
-    productVariantUpdate(input: $input) {
-      productVariant {
+export const BULK_UPDATE_PRODUCT_VARIANTS = `
+  mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+      product {
+        id
+      }
+      productVariants {
         id
         price
       }
