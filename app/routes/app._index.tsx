@@ -18,6 +18,7 @@ import {
   Spinner,
   Filters,
   ChoiceList,
+  Pagination,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -194,8 +195,11 @@ export default function Index() {
   const [products, setProducts] = useState<any[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [selectAll, setSelectAll] = useState(false);
+  const [selectAllMode, setSelectAllMode] = useState<'page' | 'collection'>('page');
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [message, setMessage] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(50);
 
   const isLoadingProducts = fetcher.state === "submitting" && 
     fetcher.formData?.get("actionType") === "getProducts";
@@ -263,6 +267,12 @@ useEffect(() => {
     return true;
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredProducts.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
+
   const handleProductSelect = (productId: string, checked: boolean) => {
     const newSelected = new Set(selectedProducts);
     if (checked) {
@@ -271,16 +281,46 @@ useEffect(() => {
       newSelected.delete(productId);
     }
     setSelectedProducts(newSelected);
-    setSelectAll(newSelected.size === filteredProducts.length);
+    updateSelectAllState(newSelected);
+  };
+
+  const updateSelectAllState = (selectedSet: Set<string>) => {
+    if (selectAllMode === 'page') {
+      setSelectAll(selectedSet.size === paginatedProducts.length && paginatedProducts.length > 0);
+    } else {
+      setSelectAll(selectedSet.size === filteredProducts.length && filteredProducts.length > 0);
+    }
   };
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+      if (selectAllMode === 'page') {
+        // Select all products on current page
+        const pageProductIds = paginatedProducts.map(p => p.id);
+        const newSelected = new Set([...selectedProducts, ...pageProductIds]);
+        setSelectedProducts(newSelected);
+      } else {
+        // Select all products in collection
+        setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+      }
     } else {
-      setSelectedProducts(new Set());
+      if (selectAllMode === 'page') {
+        // Deselect all products on current page
+        const pageProductIds = paginatedProducts.map(p => p.id);
+        const newSelected = new Set([...selectedProducts].filter(id => !pageProductIds.includes(id)));
+        setSelectedProducts(newSelected);
+      } else {
+        // Deselect all products in collection
+        setSelectedProducts(new Set());
+      }
     }
     setSelectAll(checked);
+  };
+
+  const handleSelectAllModeChange = (mode: 'page' | 'collection') => {
+    setSelectAllMode(mode);
+    setSelectAll(false);
+    updateSelectAllState(selectedProducts);
   };
 
   const handleUpdatePrices = () => {
@@ -302,13 +342,20 @@ useEffect(() => {
     fetcher.submit(formData, { method: "POST" });
   };
 
-  const tableRows = filteredProducts.map(product => {
+  const tableRows = paginatedProducts.map(product => {
     const firstVariant = product.variants[0];
     const firstVariantWeight = firstVariant?.inventoryItem?.measurement?.weight?.value;
     const firstVariantPrice = firstVariant?.price;
     
     const weightDisplay = firstVariantWeight ? `${firstVariantWeight}g` : 'N/A';
     const priceDisplay = firstVariantPrice ? `$${firstVariantPrice}` : 'N/A';
+    
+    // Calculate modifier (price per gram)
+    let modifierDisplay = 'N/A';
+    if (firstVariantWeight && firstVariantPrice && firstVariantWeight > 0) {
+      const modifier = parseFloat(firstVariantPrice) / firstVariantWeight;
+      modifierDisplay = `${modifier.toFixed(2)}`;
+    }
 
     return [
       <Checkbox
@@ -322,7 +369,8 @@ useEffect(() => {
       product.status,
       product.variants.length.toString(),
       weightDisplay,
-      priceDisplay
+      priceDisplay,
+      modifierDisplay
     ];
   });
 
@@ -441,22 +489,41 @@ useEffect(() => {
 
               {products.length > 0 && (
                 <>
-                  <InlineStack gap="300">
-                    <Checkbox
-                      label="Select All"
-                      checked={selectAll}
-                      onChange={handleSelectAll}
-                    />
+                  <InlineStack gap="300" align="space-between">
+                    <InlineStack gap="300">
+                      <Checkbox
+                        label="Select All"
+                        checked={selectAll}
+                        onChange={handleSelectAll}
+                      />
+                      <Select
+                        label=""
+                        labelHidden
+                        options={[
+                          { label: 'Current Page', value: 'page' },
+                          { label: 'Whole Collection', value: 'collection' }
+                        ]}
+                        value={selectAllMode}
+                        onChange={handleSelectAllModeChange}
+                        disabled={selectAll}
+                      />
+                    </InlineStack>
                     <Text variant="bodyMd" as="p">
                       {selectedProducts.size} of {filteredProducts.length} products selected
                     </Text>
                   </InlineStack>
 
                   <DataTable
-                    columnContentTypes={['text', 'text', 'text', 'numeric', 'text', 'text']}
-                    headings={['Select', 'Product Title', 'Status', 'Variants', 'First Variant Weight', 'First Variant Price']}
+                    columnContentTypes={['text', 'text', 'text', 'numeric', 'text', 'text', 'text']}
+                    headings={['Select', 'Product Title', 'Status', 'Variants', 'First Variant Weight', 'First Variant Price', 'Current Modifier']}
                     rows={tableRows}
                     hoverable
+                    pagination={{
+                      hasNext: currentPage < totalPages,
+                      hasPrevious: currentPage > 1,
+                      onNext: () => setCurrentPage(currentPage + 1),
+                      onPrevious: () => setCurrentPage(currentPage - 1),
+                    }}
                   />
                 </>
               )}
