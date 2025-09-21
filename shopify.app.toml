@@ -24,4 +24,4 @@ api_version = "2025-10"
 scopes = "write_products,read_products"
 
 [auth]
-redirect_urls = [ "https://variable-pricing.vercel.app/api/auth" ]
+redirect_urls = [ "https://variable-pricing.vercel.app/api/auth/callback", "https://variable-pricing.vercel.app/api/auth/oauths/callback"  ]
