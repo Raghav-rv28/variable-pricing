@@ -1,7 +1,8 @@
-import { PrismaClient } from "@prisma/client";
+import pkg from "@prisma/client";
+const { PrismaClient } = pkg;
 
 declare global {
-  var prismaGlobal: PrismaClient;
+  var prismaGlobal: InstanceType<typeof PrismaClient>;
 }
 
 if (process.env.NODE_ENV !== "production") {
