@@ -2,7 +2,7 @@
 
 client_id = "99385542f8ef479b57c0e0cf24d438e5"
 name = "variable-pricing"
-application_url = "https://example.com"
+application_url = "https://variable-pricing.vercel.app"
 embedded = true
 
 [build]
@@ -24,4 +24,4 @@ api_version = "2025-10"
 scopes = "write_products,read_products"
 
 [auth]
-redirect_urls = [ "https://example.com/api/auth" ]
+redirect_urls = [ "https://variable-pricing.vercel.app/api/auth" ]
