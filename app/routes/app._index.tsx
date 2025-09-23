@@ -95,93 +95,149 @@ const BULK_UPDATE_VARIANTS = `#graphql
 `;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  
-  // Get collections for the dropdown
-  const collectionsResponse = await admin.graphql(GET_COLLECTIONS, {
-    variables: { first: 50 }
-  });
-  
-  const collectionsData = await collectionsResponse.json();
-  const collections = collectionsData.data?.collections?.edges?.map((edge: any) => ({
-    value: edge.node.id,
-    label: `${edge.node.title} (${edge.node.productsCount.count} products)`,
-  })) || [];
+  // Server env diagnostics (safe)
+  try {
+    const safeEnv = {
+      NODE_ENV: process.env.NODE_ENV,
+      SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL,
+      PORT: process.env.PORT,
+      HAS_API_KEY: Boolean(process.env.SHOPIFY_API_KEY),
+      HAS_API_SECRET: Boolean(process.env.SHOPIFY_API_SECRET),
+      HAS_DATABASE_URL: Boolean(process.env.DATABASE_URL),
+    };
+    console.log("[Loader] Env summary:", safeEnv);
+  } catch (e) {
+    console.warn("[Loader] Failed to log env summary:", e);
+  }
 
-  return { collections };
+  try {
+    const { admin } = await authenticate.admin(request);
+    console.log("[Loader] Authenticated admin for collections fetch");
+  
+    // Get collections for the dropdown
+    const collectionsResponse = await admin.graphql(GET_COLLECTIONS, {
+      variables: { first: 50 }
+    });
+    const collectionsData = await collectionsResponse.json();
+
+    if (!collectionsData?.data) {
+      console.error("[Loader] Collections response missing data", collectionsData);
+    }
+
+    const collections = collectionsData.data?.collections?.edges?.map((edge: any) => ({
+      value: edge.node.id,
+      label: `${edge.node.title} (${edge.node.productsCount.count} products)`,
+    })) || [];
+
+    console.log(`[Loader] Loaded ${collections.length} collections`);
+    return { collections };
+  } catch (error) {
+    console.error("[Loader] Error loading collections:", error);
+    throw error;
+  }
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const formData = await request.formData();
-  const actionType = formData.get("actionType");
+  try {
+    const { admin } = await authenticate.admin(request);
+    const formData = await request.formData();
+    const actionType = formData.get("actionType");
 
-  if (actionType === "getProducts") {
-    const collectionId = formData.get("collectionId") as string;
-    
-    const response = await admin.graphql(GET_COLLECTION_PRODUCTS, {
-      variables: { 
-        collectionId, 
-        first: 100
+    console.log("[Action] Received actionType=", actionType);
+
+    if (actionType === "getProducts") {
+      const collectionId = formData.get("collectionId") as string;
+      const searchQuery = (formData.get("searchQuery") as string) || "";
+      if (!collectionId) {
+        console.error("[Action:getProducts] Missing collectionId");
+        return { products: [], errors: ["Missing collectionId"], action: "getProducts" };
       }
-    });
-    
-    const data = await response.json();
-    return { products: data.data?.collection?.products?.edges || [] };
-  }
 
-  if (actionType === "updatePrices") {
-    const selectedProducts = JSON.parse(formData.get("selectedProducts") as string);
-    const multiplier = parseFloat(formData.get("multiplier") as string);
-    
-    const results = [];
-    const errors = [];
-
-    for (const product of selectedProducts) {
       try {
-        const variantsToUpdate = product.variants
-          .filter((variant: any) => {
-            const weight = variant.inventoryItem?.measurement?.weight?.value;
-            return weight && weight > 0;
-          })
-          .map((variant: any) => {
-            const weight = variant.inventoryItem.measurement.weight.value;
-            const newPrice = (parseFloat(weight) * multiplier).toFixed(2);
-            return {
-              id: variant.id,
-              price: newPrice
-            };
-          });
-
-        if (variantsToUpdate.length > 0) {
-          const updateResponse = await admin.graphql(BULK_UPDATE_VARIANTS, {
-            variables: {
-              productId: product.id,
-              variants: variantsToUpdate
-            }
-          });
-
-          const updateData = await updateResponse.json();
-          const userErrors = updateData.data?.productVariantsBulkUpdate?.userErrors || [];
-          
-          if (userErrors.length > 0) {
-            errors.push(`${product.title}: ${userErrors.map((e: any) => e.message).join(', ')}`);
-          } else {
-            results.push({
-              productTitle: product.title,
-              variantsUpdated: variantsToUpdate.length
-            });
+        const response = await admin.graphql(GET_COLLECTION_PRODUCTS, {
+          variables: { 
+            collectionId, 
+            first: 100
           }
+        });
+        const data = await response.json();
+
+        if (!data?.data?.collection) {
+          console.error("[Action:getProducts] No collection in response", data);
         }
-      } catch (error) {
-        errors.push(`${product.title}: ${error}`);
+
+        const edges = data.data?.collection?.products?.edges || [];
+        console.log(`[Action:getProducts] searchQuery='${searchQuery}', products=${edges.length}`);
+        return { products: edges, action: "getProducts" };
+      } catch (err) {
+        console.error("[Action:getProducts] Error fetching products:", err);
+        return { products: [], errors: [String(err)], action: "getProducts" };
       }
     }
 
-    return { results, errors };
-  }
+    if (actionType === "updatePrices") {
+      const selectedProducts = JSON.parse(formData.get("selectedProducts") as string);
+      const multiplier = parseFloat(formData.get("multiplier") as string);
 
-  return null;
+      console.log(`[Action:updatePrices] products=${selectedProducts?.length || 0}, multiplier=${multiplier}`);
+      
+      const results: any[] = [];
+      const errors: string[] = [];
+
+      for (const product of selectedProducts) {
+        try {
+          const variantsToUpdate = product.variants
+            .filter((variant: any) => {
+              const weight = variant.inventoryItem?.measurement?.weight?.value;
+              return weight && weight > 0;
+            })
+            .map((variant: any) => {
+              const weight = variant.inventoryItem.measurement.weight.value;
+              const newPrice = (parseFloat(weight) * multiplier).toFixed(2);
+              return {
+                id: variant.id,
+                price: newPrice
+              };
+            });
+
+          console.log(`[Action:updatePrices] '${product.title}' variantsToUpdate=${variantsToUpdate.length}`);
+
+          if (variantsToUpdate.length > 0) {
+            const updateResponse = await admin.graphql(BULK_UPDATE_VARIANTS, {
+              variables: {
+                productId: product.id,
+                variants: variantsToUpdate
+              }
+            });
+
+            const updateData = await updateResponse.json();
+            const userErrors = updateData.data?.productVariantsBulkUpdate?.userErrors || [];
+            if (userErrors.length > 0) {
+              console.error(`[Action:updatePrices] UserErrors for '${product.title}':`, userErrors);
+              errors.push(`${product.title}: ${userErrors.map((e: any) => e.message).join(', ')}`);
+            } else {
+              results.push({
+                productTitle: product.title,
+                variantsUpdated: variantsToUpdate.length
+              });
+            }
+          }
+        } catch (error) {
+          console.error(`[Action:updatePrices] Error for '${product.title}':`, error);
+          errors.push(`${product.title}: ${error}`);
+        }
+      }
+
+      console.log(`[Action:updatePrices] Done. results=${results.length}, errors=${errors.length}`);
+      return { results, errors, action: "updatePrices" };
+    }
+
+    console.warn("[Action] Unknown actionType", actionType);
+    return { errors: ["Unknown actionType"], action: String(actionType) };
+  } catch (error) {
+    console.error("[Action] Top-level error:", error);
+    return { errors: ["Unexpected server error"], action: "unknown" };
+  }
 };
 
 export default function Index() {
@@ -206,6 +262,16 @@ export default function Index() {
   const isUpdatingPrices = fetcher.state === "submitting" && 
     fetcher.formData?.get("actionType") === "updatePrices";
 
+  // Client diagnostics
+  useEffect(() => {
+    console.log("[Client] selectedCollection=", selectedCollection);
+  }, [selectedCollection]);
+
+  useEffect(() => {
+    if (fetcher.state === "idle") return;
+    console.log("[Client] fetcher state:", fetcher.state, "formData.actionType=", fetcher.formData?.get("actionType"));
+  }, [fetcher.state]);
+
   // Load products when collection changes
   useEffect(() => {
     if (selectedCollection) {
@@ -213,6 +279,7 @@ export default function Index() {
       formData.append("actionType", "getProducts");
       formData.append("collectionId", selectedCollection);
       formData.append("searchQuery", searchQuery);
+      console.log("[Client] Submitting getProducts for collection:", selectedCollection);
       fetcher.submit(formData, { method: "POST" });
     }
   }, [selectedCollection, searchQuery]);
@@ -230,6 +297,7 @@ export default function Index() {
           variantEdge.node.inventoryItem?.measurement?.weight?.value > 0
         )
       }));
+      console.log(`[Client] Received products: ${productData.length}`);
       setProducts(productData);
       setSelectedProducts(new Set());
       setSelectAll(false);
@@ -239,7 +307,8 @@ export default function Index() {
 // Handle update results
 useEffect(() => {
   if (fetcher.data && 'results' in fetcher.data && fetcher.data.results) {
-    const { results, errors } = fetcher.data;
+    const { results, errors } = fetcher.data as any;
+    console.log(`[Client] Update results=${results.length}, errors=${errors?.length || 0}`);
     if (results.length > 0) {
       const totalUpdated = results.reduce((sum: number, r: any) => sum + r.variantsUpdated, 0);
       setMessage(`Successfully updated ${totalUpdated} variants across ${results.length} products.`);
@@ -256,9 +325,22 @@ useEffect(() => {
     }
     if (errors && errors.length > 0) {
       setMessage(`Errors occurred: ${errors.join('; ')}`);
+      try { shopify.toast.show("Errors occurred while updating prices"); } catch {}
     }
   }
 }, [fetcher.data, shopify, selectedCollection, searchQuery]);
+
+// Handle generic errors returned from actions without results (e.g., getProducts errors)
+useEffect(() => {
+  if (fetcher.data && 'errors' in fetcher.data && (!('results' in fetcher.data) || !fetcher.data.results)) {
+    const { errors, action } = fetcher.data as any;
+    if (errors && errors.length > 0) {
+      console.error(`[Client] Action '${action}' returned errors:`, errors);
+      setMessage(`Errors occurred: ${errors.join('; ')}`);
+      try { shopify.toast.show(`Error: ${errors[0]}`); } catch {}
+    }
+  }
+}, [fetcher.data, shopify]);
 
   const filteredProducts = products.filter(product => {
     if (statusFilter.length > 0 && !statusFilter.includes(product.status.toLowerCase())) {
@@ -274,6 +356,7 @@ useEffect(() => {
   const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
   const handleProductSelect = (productId: string, checked: boolean) => {
+    console.log(`[Client] Product select ${checked ? 'on' : 'off'}:`, productId);
     const newSelected = new Set(selectedProducts);
     if (checked) {
       newSelected.add(productId);
@@ -293,6 +376,7 @@ useEffect(() => {
   };
 
   const handleSelectAll = (checked: boolean) => {
+    console.log(`[Client] SelectAll ${checked ? 'on' : 'off'} mode=${selectAllMode}`);
     if (checked) {
       if (selectAllMode === 'page') {
         // Select all products on current page
@@ -318,12 +402,14 @@ useEffect(() => {
   };
 
   const handleSelectAllModeChange = (mode: 'page' | 'collection') => {
+    console.log("[Client] selectAllMode=", mode);
     setSelectAllMode(mode);
     setSelectAll(false);
     updateSelectAllState(selectedProducts);
   };
 
   const handleUpdatePrices = () => {
+    console.log("[Client] handleUpdatePrices clicked. selected=", selectedProducts.size, "multiplier=", multiplier);
     if (!multiplier || isNaN(parseFloat(multiplier))) {
       setMessage("Please enter a valid multiplier");
       return;
@@ -338,7 +424,8 @@ useEffect(() => {
     formData.append("actionType", "updatePrices");
     formData.append("selectedProducts", JSON.stringify(selectedProductData));
     formData.append("multiplier", multiplier);
-    
+
+    console.log(`[Client] Submitting updatePrices for products=${selectedProductData.length}`);
     fetcher.submit(formData, { method: "POST" });
   };
 
