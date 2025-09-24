@@ -19,6 +19,8 @@ import {
   Filters,
   ChoiceList,
   Pagination,
+  Link,
+  Popover,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -53,6 +55,14 @@ const GET_COLLECTION_PRODUCTS = `#graphql
             title
             handle
             status
+            featuredMedia {
+              preview {
+                image {
+                  url
+                  altText
+                }
+              }
+            }
             variants(first: 10) {
               edges {
                 node {
@@ -95,20 +105,7 @@ const BULK_UPDATE_VARIANTS = `#graphql
 `;
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  // Server env diagnostics (safe)
-  try {
-    const safeEnv = {
-      NODE_ENV: process.env.NODE_ENV,
-      SHOPIFY_APP_URL: process.env.SHOPIFY_APP_URL,
-      PORT: process.env.PORT,
-      HAS_API_KEY: Boolean(process.env.SHOPIFY_API_KEY),
-      HAS_API_SECRET: Boolean(process.env.SHOPIFY_API_SECRET),
-      HAS_DATABASE_URL: Boolean(process.env.DATABASE_URL),
-    };
-    console.log("[Loader] Env summary:", safeEnv);
-  } catch (e) {
-    console.warn("[Loader] Failed to log env summary:", e);
-  }
+
 
   try {
     const { admin } = await authenticate.admin(request);
@@ -256,6 +253,7 @@ export default function Index() {
   const [message, setMessage] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(50);
+  const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
 
   const isLoadingProducts = fetcher.state === "submitting" && 
     fetcher.formData?.get("actionType") === "getProducts";
@@ -292,6 +290,8 @@ export default function Index() {
         title: edge.node.title,
         handle: edge.node.handle,
         status: edge.node.status,
+        imgUrl: edge.node.featuredMedia?.preview?.image?.url,
+        imgAlt: edge.node.featuredMedia?.preview?.image?.altText || edge.node.title,
         variants: edge.node.variants.edges.map((variantEdge: any) => variantEdge.node),
         hasWeight: edge.node.variants.edges.some((variantEdge: any) => 
           variantEdge.node.inventoryItem?.measurement?.weight?.value > 0
@@ -452,7 +452,33 @@ useEffect(() => {
         onChange={(checked) => handleProductSelect(product.id, checked)}
         disabled={!product.hasWeight}
       />,
-      product.title,
+      <InlineStack gap="200" align="start">
+        <Popover
+          active={hoveredProductId === product.id}
+          preferredAlignment="left"
+          preferredPosition="below"
+          activator={
+            <span
+              onMouseEnter={() => setHoveredProductId(product.id)}
+              onMouseLeave={() => setHoveredProductId(null)}
+            >
+              <Link target="_blank" url={`https://dubaijewellers.ca/products/${product.handle}`}>{product.title}</Link>
+            </span>
+          }
+          onClose={() => setHoveredProductId(null)}
+        >{product.imgUrl && (
+          <div style={{ padding: 8 }}>
+              <img
+                src={product.imgUrl}
+                alt={product.imgAlt}
+                width={180}
+                height={180}
+                style={{ objectFit: 'cover', borderRadius: 6 }}
+              />
+          
+          </div> )}
+        </Popover>
+      </InlineStack>,
       product.status,
       product.variants.length.toString(),
       weightDisplay,
