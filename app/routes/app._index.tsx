@@ -254,6 +254,8 @@ export default function Index() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(50);
   const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
+  const [sortedColumnIndex, setSortedColumnIndex] = useState<number | undefined>(undefined);
+  const [sortDirection, setSortDirection] = useState<'ascending' | 'descending' | 'none'>('none');
 
   const isLoadingProducts = fetcher.state === "submitting" && 
     fetcher.formData?.get("actionType") === "getProducts";
@@ -355,6 +357,27 @@ useEffect(() => {
   const endIndex = startIndex + pageSize;
   const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
+  // Sorting logic for table columns: Weight (2), Price (3), Modifier (4)
+  const sortedProducts = (() => {
+    if (sortedColumnIndex === undefined || sortDirection === 'none') return paginatedProducts;
+    const productsCopy = [...paginatedProducts];
+    const getNumeric = (product: any): number => {
+      const firstVariant = product.variants[0];
+      const weight = parseFloat(firstVariant?.inventoryItem?.measurement?.weight?.value ?? '0') || 0;
+      const price = parseFloat(firstVariant?.price ?? '0') || 0;
+      if (sortedColumnIndex === 2) return weight;
+      if (sortedColumnIndex === 3) return price;
+      if (sortedColumnIndex === 4) return weight > 0 ? price / weight : 0;
+      return 0;
+    };
+    productsCopy.sort((a, b) => {
+      const av = getNumeric(a);
+      const bv = getNumeric(b);
+      return sortDirection === 'ascending' ? av - bv : bv - av;
+    });
+    return productsCopy;
+  })();
+
   const handleProductSelect = (productId: string, checked: boolean) => {
     console.log(`[Client] Product select ${checked ? 'on' : 'off'}:`, productId);
     const newSelected = new Set(selectedProducts);
@@ -429,7 +452,7 @@ useEffect(() => {
     fetcher.submit(formData, { method: "POST" });
   };
 
-  const tableRows = paginatedProducts.map(product => {
+  const tableRows = sortedProducts.map(product => {
     const firstVariant = product.variants[0];
     const firstVariantWeight = firstVariant?.inventoryItem?.measurement?.weight?.value;
     const firstVariantPrice = firstVariant?.price;
@@ -634,6 +657,11 @@ useEffect(() => {
                   </InlineStack>
 
                   <DataTable
+                    sortable={[false, false, true, true, true, false, false]}
+                    onSort={(index, direction) => {
+                      setSortedColumnIndex(index);
+                      setSortDirection(direction);
+                    }}
                     columnContentTypes={['text', 'text', 'text', 'text', 'text', 'numeric', 'text']}
                     headings={['Select', 'Product Title', 'Weight', 'Price', 'Current Modifier', 'Variants', 'Status']}
                     rows={tableRows}
