@@ -445,6 +445,7 @@ useEffect(() => {
     }
 
     return [
+      // Select
       <Checkbox
         label=""
         key={product.id}
@@ -452,6 +453,7 @@ useEffect(() => {
         onChange={(checked) => handleProductSelect(product.id, checked)}
         disabled={!product.hasWeight}
       />,
+      // Title (with hover image)
       <InlineStack gap="200" align="start">
         <Popover
           active={hoveredProductId === product.id}
@@ -479,11 +481,16 @@ useEffect(() => {
           </div> )}
         </Popover>
       </InlineStack>,
-      product.status,
-      product.variants.length.toString(),
+      // Weight
       weightDisplay,
+      // Price
       priceDisplay,
-      modifierDisplay
+      // Modifier
+      modifierDisplay,
+      // Variants count
+      product.variants.length.toString(),
+      // Status
+      product.status
     ];
   });
 
@@ -627,8 +634,8 @@ useEffect(() => {
                   </InlineStack>
 
                   <DataTable
-                    columnContentTypes={['text', 'text', 'text', 'numeric', 'text', 'text', 'text']}
-                    headings={['Select', 'Product Title', 'Status', 'Variants', 'First Variant Weight', 'First Variant Price', 'Current Modifier']}
+                    columnContentTypes={['text', 'text', 'text', 'text', 'text', 'numeric', 'text']}
+                    headings={['Select', 'Product Title', 'Weight', 'Price', 'Current Modifier', 'Variants', 'Status']}
                     rows={tableRows}
                     hoverable
                     pagination={{
