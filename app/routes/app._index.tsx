@@ -351,16 +351,11 @@ useEffect(() => {
     return true;
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(filteredProducts.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
-
   // Sorting logic for table columns: Weight (2), Price (3), Modifier (4)
+  // Apply sorting to all filtered products before pagination
   const sortedProducts = (() => {
-    if (sortedColumnIndex === undefined || sortDirection === 'none') return paginatedProducts;
-    const productsCopy = [...paginatedProducts];
+    if (sortedColumnIndex === undefined || sortDirection === 'none') return filteredProducts;
+    const productsCopy = [...filteredProducts];
     const getNumeric = (product: any): number => {
       const firstVariant = product.variants[0];
       const weight = parseFloat(firstVariant?.inventoryItem?.measurement?.weight?.value ?? '0') || 0;
@@ -378,6 +373,12 @@ useEffect(() => {
     return productsCopy;
   })();
 
+  // Pagination logic - now applied to sorted products
+  const totalPages = Math.ceil(sortedProducts.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
+
   const handleProductSelect = (productId: string, checked: boolean) => {
     console.log(`[Client] Product select ${checked ? 'on' : 'off'}:`, productId);
     const newSelected = new Set(selectedProducts);
@@ -394,7 +395,7 @@ useEffect(() => {
     if (selectAllMode === 'page') {
       setSelectAll(selectedSet.size === paginatedProducts.length && paginatedProducts.length > 0);
     } else {
-      setSelectAll(selectedSet.size === filteredProducts.length && filteredProducts.length > 0);
+      setSelectAll(selectedSet.size === sortedProducts.length && sortedProducts.length > 0);
     }
   };
 
@@ -408,7 +409,7 @@ useEffect(() => {
         setSelectedProducts(newSelected);
       } else {
         // Select all products in collection
-        setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+        setSelectedProducts(new Set(sortedProducts.map(p => p.id)));
       }
     } else {
       if (selectAllMode === 'page') {
@@ -442,7 +443,7 @@ useEffect(() => {
       return;
     }
 
-    const selectedProductData = filteredProducts.filter(p => selectedProducts.has(p.id));
+    const selectedProductData = sortedProducts.filter(p => selectedProducts.has(p.id));
     const formData = new FormData();
     formData.append("actionType", "updatePrices");
     formData.append("selectedProducts", JSON.stringify(selectedProductData));
@@ -452,7 +453,7 @@ useEffect(() => {
     fetcher.submit(formData, { method: "POST" });
   };
 
-  const tableRows = sortedProducts.map(product => {
+  const tableRows = paginatedProducts.map(product => {
     const firstVariant = product.variants[0];
     const firstVariantWeight = firstVariant?.inventoryItem?.measurement?.weight?.value;
     const firstVariantPrice = firstVariant?.price;
@@ -652,7 +653,7 @@ useEffect(() => {
                       />
                     </InlineStack>
                     <Text variant="bodyMd" as="p">
-                      {selectedProducts.size} of {filteredProducts.length} products selected
+                      {selectedProducts.size} of {sortedProducts.length} products selected
                     </Text>
                   </InlineStack>
 
