@@ -1,0 +1,19 @@
+
+api_version = "2025-04"
+[[extensions]]
+name = "invoice-print"
+handle = "invoice-print"
+type = "ui_extension"
+uid = "3fe5c5f0-40e6-0806-b907-38146f604a1b704f0802"
+
+# Only 1 target can be specified for each admin print action extension
+[[extensions.targeting]]
+module = "./src/PrintActionExtension.jsx"
+target = "admin.order-details.print-action.render"
+
+# Valid extension targets:
+
+# - admin.order-details.print-action.render
+# - admin.order-index.selection-print-action.render
+# - admin.product-details.print-action.render
+# - admin.product-index.selection-print-action.render

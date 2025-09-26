@@ -242,6 +242,11 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const shopify = useAppBridge();
 
+  // Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+
   const [selectedCollection, setSelectedCollection] = useState("");
   const [multiplier, setMultiplier] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -261,6 +266,35 @@ export default function Index() {
     fetcher.formData?.get("actionType") === "getProducts";
   const isUpdatingPrices = fetcher.state === "submitting" && 
     fetcher.formData?.get("actionType") === "updatePrices";
+
+  // Authentication logic
+  const handleLogin = () => {
+    if (password === "69420") {
+      setIsAuthenticated(true);
+      setLoginError("");
+    } else {
+      setLoginError("Incorrect password");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setPassword("");
+    setLoginError("");
+    // Reset all app state
+    setSelectedCollection("");
+    setMultiplier("");
+    setSearchQuery("");
+    setProducts([]);
+    setSelectedProducts(new Set());
+    setSelectAll(false);
+    setStatusFilter([]);
+    setMessage("");
+    setCurrentPage(1);
+    setHoveredProductId(null);
+    setSortedColumnIndex(undefined);
+    setSortDirection('none');
+  };
 
   // Client diagnostics
   useEffect(() => {
@@ -551,6 +585,56 @@ useEffect(() => {
     onRemove: () => setStatusFilter(statusFilter.filter(s => s !== status)),
   }));
 
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <Page>
+        <TitleBar title="Bulk Weight Price Multiplier" />
+        
+        <BlockStack gap="500">
+          <Card>
+            <BlockStack gap="400">
+              <Text as="h2" variant="headingMd">
+                Access Required
+              </Text>
+              <Text variant="bodyMd" as="p">
+                Please enter the password to access the bulk price update tool.
+              </Text>
+              
+              <Box maxWidth="300px">
+                <TextField
+                  label="Password"
+                  value={password}
+                  onChange={setPassword}
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Enter password"
+                />
+              </Box>
+              
+              <InlineStack gap="300">
+                <Button
+                  variant="primary"
+                  onClick={handleLogin}
+                  disabled={!password.trim()}
+                >
+                  Login
+                </Button>
+              </InlineStack>
+
+              {loginError && (
+                <Banner tone="critical">
+                  <p>{loginError}</p>
+                </Banner>
+              )}
+            </BlockStack>
+          </Card>
+        </BlockStack>
+      </Page>
+    );
+  }
+
+  // Show main UI if authenticated
   return (
     <Page>
       <TitleBar title="Bulk Weight Price Multiplier" />
@@ -558,9 +642,18 @@ useEffect(() => {
       <BlockStack gap="500">
         <Card>
           <BlockStack gap="400">
-            <Text as="h2" variant="headingMd">
-              Bulk Price Update Tool
-            </Text>
+            <InlineStack gap="400" align="space-between">
+              <Text as="h2" variant="headingMd">
+                Bulk Price Update Tool
+              </Text>
+              <Button
+                variant="secondary"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </InlineStack>
+            
             <Text variant="bodyMd" as="p">
               Select a collection and multiply product variant prices by their weight and a custom multiplier.
               New price = weight (grams) × multiplier
