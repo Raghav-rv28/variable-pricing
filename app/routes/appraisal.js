@@ -117,6 +117,7 @@ export async function loader({ request }) {
 
 function appraisalPage(order) {
   const appraisalDate = new Date(order.createdAt).toLocaleDateString();
+  const subtotal = parseFloat(order.subtotalPriceSet.shopMoney.amount);
   const total = parseFloat(order.totalPriceSet.shopMoney.amount);
   const totalDiscounts = parseFloat(order.totalDiscountsSet.shopMoney.amount);
   const totalShipping = parseFloat(order.totalShippingPriceSet.shopMoney.amount);
@@ -231,14 +232,21 @@ function appraisalPage(order) {
       </div>
       
       <div class="totals">
+      <div class="totals-row">
+        <span class="label">Subtotal:</span>
+        <span class="amount">$${subtotal.toFixed(2)}</span>
+      </div>
+      ${totalDiscounts > 0 ? `
         <div class="totals-row total-row">
           <span class="label">Total Discounts:</span>
           <span class="amount">- $${totalDiscounts.toFixed(2)}</span>
-        </div>
+        </div>` : ''}
+        ${totalShipping > 0 ? `
         <div class="totals-row total-row">
           <span class="label">Total Shipping:</span>
           <span class="amount">$${totalShipping.toFixed(2)}</span>
-        </div>
+        </div>` : ''}
+
         <div class="totals-row total-row">
           <span class="label">Total Appraised Value:</span>
           <span class="amount">$${total.toFixed(2)}</span>

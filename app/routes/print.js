@@ -197,14 +197,16 @@ function orderPage(order) {
           <span class="label">Taxes:</span>
           <span class="amount">$${taxes.toFixed(2)}</span>
         </div>
-        {totalDiscounts > 0 && <div class="totals-row total-row">
-          <span class="label">Total Discounts:</span>
-          <span class="amount">- $${totalDiscounts.toFixed(2)}</span>
-        </div>}
-        {totalShipping > 0 && <div class="totals-row total-row">
-          <span class="label">Total Shipping:</span>
-          <span class="amount">$${totalShipping.toFixed(2)}</span>
-        </div>}
+        ${totalDiscounts > 0 ? `
+          <div class="totals-row total-row">
+            <span class="label">Total Discounts:</span>
+            <span class="amount">- $${totalDiscounts.toFixed(2)}</span>
+          </div>` : ''}
+          ${totalShipping > 0 ? `
+          <div class="totals-row total-row">
+            <span class="label">Total Shipping:</span>
+            <span class="amount">$${totalShipping.toFixed(2)}</span>
+          </div>` : ''}
         <div class="totals-row total-row">
           <span class="label">Total:</span>
           <span class="amount">$${total.toFixed(2)}</span>
