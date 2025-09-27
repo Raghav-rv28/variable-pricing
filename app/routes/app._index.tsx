@@ -677,7 +677,15 @@ useEffect(() => {
       // Variants count
       product.variants.length.toString(),
       // Status
-      product.status
+      product.status,
+      // Edit button
+      <Button
+        size="micro"
+        variant="tertiary"
+        onClick={() => window.open(`https://admin.shopify.com/store/dubai-jewellers-2226/products/${productIdDisplay}`, '_blank')}
+      >
+        Edit
+      </Button>
     ];
   });
 
@@ -885,13 +893,13 @@ useEffect(() => {
                   </InlineStack>
 
                   <DataTable
-                    sortable={[false, false, false, true, true, true, false, false]}
+                    sortable={[false, false, false, true, true, true, false, false, false]}
                     onSort={(index, direction) => {
                       setSortedColumnIndex(index);
                       setSortDirection(direction);
                     }}
-                    columnContentTypes={['text', 'numeric', 'text', 'text', 'text', 'text', 'numeric', 'text']}
-                    headings={['Select', 'Product ID', 'Product Title', 'Weight', 'Price', 'Current Modifier', 'Variants', 'Status']}
+                    columnContentTypes={['text', 'numeric', 'text', 'text', 'text', 'text', 'numeric', 'text', 'text']}
+                    headings={['Select', 'Product ID', 'Product Title', 'Weight', 'Price', 'Current Modifier', 'Variants', 'Status', 'Edit']}
                     rows={tableRows}
                     hoverable
                     pagination={{
