@@ -106,16 +106,17 @@ function orderPage(order) {
   let content = `
     <div class="page">
       <div class="header">
-        <div class="company-info">
+        <div class="order-number">
+          <strong>Order:</strong> ${order.name}
+        </div>
+        <div class="company-logo">
           ${companyLogoUrl === "https://cdn.shopify.com/s/files/1/0736/0882/3069/files/logo_02d03eb2-da73-4140-a7fa-80e13c3efe71.png?v=1682698240" ? 
-            `<img src="${companyLogoUrl}" alt="Company Logo" class="company-logo" />` : 
-            '<div class="company-logo-placeholder">Company Logo</div>'
+            `<img src="${companyLogoUrl}" alt="Company Logo" class="logo-image" />` : 
+            '<div class="logo-placeholder">Company Logo</div>'
           }
         </div>
-        <h1>Invoice</h1>
-        <div class="order-info">
-          <p><strong>Order:</strong> ${order.name}</p>
-          <p><strong>Date:</strong> ${orderDate}</p>
+        <div class="order-date">
+          <strong>Date:</strong> ${orderDate}
         </div>
       </div>
       
@@ -145,7 +146,6 @@ function orderPage(order) {
               <th>Image</th>
               <th>Item</th>
               <th>Quantity</th>
-              <th>Unit Price</th>
               <th>Total</th>
               <th>Description</th>
             </tr>
@@ -228,46 +228,39 @@ function printHTML(invoice) {
         }
         
         .header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
           border-bottom: 2px solid #333;
-          padding-bottom: 10px;
+          padding: 15px 0;
           margin-bottom: 20px;
         }
         
-        .company-info {
-          text-align: center;
-          margin-bottom: 20px;
+        .order-number, .order-date {
+          font-size: 14px;
+          color: #333;
         }
         
         .company-logo {
-          max-height: 80px;
-          max-width: 200px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
         
-        .company-logo-placeholder {
-          height: 60px;
-          width: 200px;
+        .logo-image {
+          max-height: 50px;
+          max-width: 150px;
+        }
+        
+        .logo-placeholder {
+          height: 40px;
+          width: 150px;
           border: 2px dashed #ccc;
           display: flex;
           align-items: center;
           justify-content: center;
-          margin: 0 auto;
           color: #666;
-          font-size: 14px;
-        }
-        
-        .header h1 {
-          margin: 0 0 10px 0;
-          color: #333;
-          text-align: center;
-        }
-        
-        .order-info {
-          display: flex;
-          gap: 20px;
-        }
-        
-        .order-info p {
-          margin: 5px 0;
+          font-size: 12px;
         }
         
         .customer-info, .items {
