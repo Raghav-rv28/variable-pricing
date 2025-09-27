@@ -131,7 +131,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       label: `${edge.node.title} (${edge.node.productsCount.count} products)`,
     })) || [];
 
-    console.log(`[Loader] Loaded ${collections.length} collections`);
+    // Sort collections alphabetically by title
+    collections.sort((a: any, b: any) => {
+      const titleA = a.label.split(' (')[0].toLowerCase();
+      const titleB = b.label.split(' (')[0].toLowerCase();
+      return titleA.localeCompare(titleB);
+    });
+
+    console.log(`[Loader] Loaded ${collections.length} collections (sorted alphabetically)`);
     return { collections };
   } catch (error) {
     console.error("[Loader] Error loading collections:", error);
@@ -360,22 +367,27 @@ export default function Index() {
     console.log("[Client] selectedCollection=", selectedCollection);
   }, [selectedCollection]);
 
+  // Reset pagination when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, selectedCollection]);
+
   useEffect(() => {
     if (fetcher.state === "idle") return;
     console.log("[Client] fetcher state:", fetcher.state, "formData.actionType=", fetcher.formData?.get("actionType"));
   }, [fetcher.state]);
 
-  // Load products when collection changes
+  // Load products when collection changes (search is now client-side)
   useEffect(() => {
     if (selectedCollection) {
       const formData = new FormData();
       formData.append("actionType", "getProducts");
       formData.append("collectionId", selectedCollection);
-      formData.append("searchQuery", searchQuery);
+      formData.append("searchQuery", ""); // No server-side search needed
       console.log("[Client] Submitting getProducts for collection:", selectedCollection);
       fetcher.submit(formData, { method: "POST" });
     }
-  }, [selectedCollection, searchQuery]);
+  }, [selectedCollection]);
 
   // Update products when fetcher data changes
   useEffect(() => {
@@ -461,9 +473,23 @@ useEffect(() => {
 }, [fetcher.data, shopify]);
 
   const filteredProducts = products.filter(product => {
+    // Status filter
     if (statusFilter.length > 0 && !statusFilter.includes(product.status.toLowerCase())) {
       return false;
     }
+    
+    // Search filter (live search on title and product ID)
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      const productId = product.id.split('/').pop() || product.id;
+      const title = product.title.toLowerCase();
+      
+      // Search in both product title and product ID
+      if (!title.includes(query) && !productId.includes(query)) {
+        return false;
+      }
+    }
+    
     return true;
   });
 
@@ -472,8 +498,9 @@ useEffect(() => {
   console.log(`  - Original products: ${products.length}`);
   console.log(`  - After status filter: ${filteredProducts.length}`);
   console.log(`  - Status filter applied: ${statusFilter.length > 0 ? statusFilter.join(', ') : 'none'}`);
+  console.log(`  - Search query: "${searchQuery}"`);
 
-  // Sorting logic for table columns: Weight (2), Price (3), Modifier (4)
+  // Sorting logic for table columns: Weight (3), Price (4), Modifier (5)
   // Apply sorting to all filtered products before pagination
   const sortedProducts = (() => {
     if (sortedColumnIndex === undefined || sortDirection === 'none') return filteredProducts;
@@ -482,9 +509,9 @@ useEffect(() => {
       const firstVariant = product.variants[0];
       const weight = parseFloat(firstVariant?.inventoryItem?.measurement?.weight?.value ?? '0') || 0;
       const price = parseFloat(firstVariant?.price ?? '0') || 0;
-      if (sortedColumnIndex === 2) return weight;
-      if (sortedColumnIndex === 3) return price;
-      if (sortedColumnIndex === 4) return weight > 0 ? price / weight : 0;
+      if (sortedColumnIndex === 3) return weight;
+      if (sortedColumnIndex === 4) return price;
+      if (sortedColumnIndex === 5) return weight > 0 ? price / weight : 0;
       return 0;
     };
     productsCopy.sort((a, b) => {
@@ -599,6 +626,9 @@ useEffect(() => {
       modifierDisplay = `${modifier.toFixed(2)}`;
     }
 
+    // Extract numeric product ID from Shopify GID
+    const productIdDisplay = product.id.split('/').pop() || product.id;
+
     return [
       // Select
       <Checkbox
@@ -608,6 +638,8 @@ useEffect(() => {
         onChange={(checked) => handleProductSelect(product.id, checked)}
         disabled={!product.hasWeight}
       />,
+      // Product ID
+      productIdDisplay,
       // Title (with hover image)
       <InlineStack gap="200" align="start">
         <Popover
@@ -813,7 +845,7 @@ useEffect(() => {
 
               <Filters
                 queryValue={searchQuery}
-                queryPlaceholder="Search products..."
+                queryPlaceholder="Search products by title or ID..."
                 filters={filters}
                 appliedFilters={appliedFilters}
                 onQueryChange={setSearchQuery}
@@ -853,13 +885,13 @@ useEffect(() => {
                   </InlineStack>
 
                   <DataTable
-                    sortable={[false, false, true, true, true, false, false]}
+                    sortable={[false, false, false, true, true, true, false, false]}
                     onSort={(index, direction) => {
                       setSortedColumnIndex(index);
                       setSortDirection(direction);
                     }}
-                    columnContentTypes={['text', 'text', 'text', 'text', 'text', 'numeric', 'text']}
-                    headings={['Select', 'Product Title', 'Weight', 'Price', 'Current Modifier', 'Variants', 'Status']}
+                    columnContentTypes={['text', 'numeric', 'text', 'text', 'text', 'text', 'numeric', 'text']}
+                    headings={['Select', 'Product ID', 'Product Title', 'Weight', 'Price', 'Current Modifier', 'Variants', 'Status']}
                     rows={tableRows}
                     hoverable
                     pagination={{
