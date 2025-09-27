@@ -107,7 +107,7 @@ function orderPage(order) {
     <div class="page">
       <div class="header">
         <div class="company-info">
-          ${companyLogoUrl !== "https://cdn.shopify.com/s/files/1/0736/0882/3069/files/logo_02d03eb2-da73-4140-a7fa-80e13c3efe71.png?v=1682698240" ? 
+          ${companyLogoUrl === "https://cdn.shopify.com/s/files/1/0736/0882/3069/files/logo_02d03eb2-da73-4140-a7fa-80e13c3efe71.png?v=1682698240" ? 
             `<img src="${companyLogoUrl}" alt="Company Logo" class="company-logo" />` : 
             '<div class="company-logo-placeholder">Company Logo</div>'
           }
@@ -167,7 +167,6 @@ function orderPage(order) {
         </td>
         <td>${item.title}</td>
         <td>${item.quantity}</td>
-        <td>$${unitPrice.toFixed(2)}</td>
         <td>$${totalPrice.toFixed(2)}</td>
         <td>${item.product.descriptionHtml || item.product.description || ''}</td>
       </tr>
