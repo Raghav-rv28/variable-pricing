@@ -26,6 +26,16 @@ export async function loader({ request }) {
           shopMoney {
             amount
           }
+        }   
+        totalDiscountsSet {
+          shopMoney {
+            amount
+          }
+        }
+        totalShippingPriceSet {
+          shopMoney {
+            amount
+          }
         }
         customer {
           firstName
@@ -108,6 +118,8 @@ export async function loader({ request }) {
 function appraisalPage(order) {
   const appraisalDate = new Date(order.createdAt).toLocaleDateString();
   const total = parseFloat(order.totalPriceSet.shopMoney.amount);
+  const totalDiscounts = parseFloat(order.totalDiscountsSet.shopMoney.amount);
+  const totalShipping = parseFloat(order.totalShippingPriceSet.shopMoney.amount);
   
   // Company logo URL
   const companyLogoUrl = "https://cdn.shopify.com/s/files/1/0736/0882/3069/files/logo_02d03eb2-da73-4140-a7fa-80e13c3efe71.png?v=1682698240";
@@ -219,6 +231,14 @@ function appraisalPage(order) {
       </div>
       
       <div class="totals">
+        <div class="totals-row total-row">
+          <span class="label">Total Discounts:</span>
+          <span class="amount">- $${totalDiscounts.toFixed(2)}</span>
+        </div>
+        <div class="totals-row total-row">
+          <span class="label">Total Shipping:</span>
+          <span class="amount">$${totalShipping.toFixed(2)}</span>
+        </div>
         <div class="totals-row total-row">
           <span class="label">Total Appraised Value:</span>
           <span class="amount">$${total.toFixed(2)}</span>

@@ -27,6 +27,16 @@ export async function loader({ request }) {
             amount
           }
         }
+        totalDiscountsSet {
+          shopMoney {
+            amount
+          }
+        }
+        totalShippingPriceSet {
+          shopMoney {
+            amount
+          }
+        }
         customer {
           firstName
           lastName
@@ -98,6 +108,8 @@ function orderPage(order) {
   const subtotal = parseFloat(order.subtotalPriceSet.shopMoney.amount);
   const taxes = parseFloat(order.totalTaxSet.shopMoney.amount);
   const total = parseFloat(order.totalPriceSet.shopMoney.amount);
+  const totalDiscounts = parseFloat(order.totalDiscountsSet.shopMoney.amount);
+  const totalShipping = parseFloat(order.totalShippingPriceSet.shopMoney.amount);
   console.log(order.lineItems.edges.map(edge => edge.node.product.descriptionHtml));
   
   // Company logo URL - replace with your actual logo URL
@@ -184,6 +196,14 @@ function orderPage(order) {
         <div class="totals-row">
           <span class="label">Taxes:</span>
           <span class="amount">$${taxes.toFixed(2)}</span>
+        </div>
+        <div class="totals-row total-row">
+          <span class="label">Total Discounts:</span>
+          <span class="amount">- $${totalDiscounts.toFixed(2)}</span>
+        </div>
+        <div class="totals-row total-row">
+          <span class="label">Total Shipping:</span>
+          <span class="amount">$${totalShipping.toFixed(2)}</span>
         </div>
         <div class="totals-row total-row">
           <span class="label">Total:</span>
