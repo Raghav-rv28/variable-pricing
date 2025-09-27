@@ -48,6 +48,7 @@ export async function loader({ request }) {
               title
               product {
                 description
+                descriptionHtml
                 featuredImage {
                   url
                   altText
@@ -97,15 +98,16 @@ function orderPage(order) {
   const subtotal = parseFloat(order.subtotalPriceSet.shopMoney.amount);
   const taxes = parseFloat(order.totalTaxSet.shopMoney.amount);
   const total = parseFloat(order.totalPriceSet.shopMoney.amount);
+  console.log(order.lineItems.edges.map(edge => edge.node.product.descriptionHtml));
   
   // Company logo URL - replace with your actual logo URL
-  const companyLogoUrl = "YOUR_COMPANY_LOGO_URL_HERE";
+  const companyLogoUrl = "https://cdn.shopify.com/s/files/1/0736/0882/3069/files/logo_02d03eb2-da73-4140-a7fa-80e13c3efe71.png?v=1682698240";
   
   let content = `
     <div class="page">
       <div class="header">
         <div class="company-info">
-          ${companyLogoUrl !== "YOUR_COMPANY_LOGO_URL_HERE" ? 
+          ${companyLogoUrl !== "https://cdn.shopify.com/s/files/1/0736/0882/3069/files/logo_02d03eb2-da73-4140-a7fa-80e13c3efe71.png?v=1682698240" ? 
             `<img src="${companyLogoUrl}" alt="Company Logo" class="company-logo" />` : 
             '<div class="company-logo-placeholder">Company Logo</div>'
           }
@@ -119,17 +121,20 @@ function orderPage(order) {
       
       <div class="customer-info">
         <h2>Customer Information</h2>
-        <p><strong>Name:</strong> ${order.customer?.firstName || ''} ${order.customer?.lastName || ''}</p>
-        <p><strong>Email:</strong> ${order.customer?.email || ''}</p>
-      </div>
-      
-      <div class="shipping-info">
-        <h2>Shipping Address</h2>
-        <p>${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}</p>
-        <p>${order.shippingAddress?.address1 || ''}</p>
-        ${order.shippingAddress?.address2 ? `<p>${order.shippingAddress.address2}</p>` : ''}
-        <p>${order.shippingAddress?.city || ''}, ${order.shippingAddress?.province || ''} ${order.shippingAddress?.zip || ''}</p>
-        <p>${order.shippingAddress?.country || ''}</p>
+        <div class="customer-details">
+          <div class="customer-left">
+            <p><strong>Name:</strong> ${order.customer?.firstName || ''} ${order.customer?.lastName || ''}</p>
+            <p><strong>Email:</strong> ${order.customer?.email || ''}</p>
+          </div>
+          <div class="customer-right">
+            <p><strong>Address:</strong> ${[
+              order.shippingAddress?.address1 || '',
+              order.shippingAddress?.address2 || '',
+              `${order.shippingAddress?.city || ''}, ${order.shippingAddress?.province || ''} ${order.shippingAddress?.zip || ''}`.replace(/^,\s*/, '').replace(/,\s*$/, ''),
+              order.shippingAddress?.country || ''
+            ].filter(part => part.trim()).join(', ')}</p>
+          </div>
+        </div>
       </div>
       
       <div class="items">
@@ -164,7 +169,7 @@ function orderPage(order) {
         <td>${item.quantity}</td>
         <td>$${unitPrice.toFixed(2)}</td>
         <td>$${totalPrice.toFixed(2)}</td>
-        <td>${item.product.description || ''}</td>
+        <td>${item.product.descriptionHtml || item.product.description || ''}</td>
       </tr>
     `;
   }).join('')}
@@ -266,14 +271,28 @@ function printHTML(invoice) {
           margin: 5px 0;
         }
         
-        .customer-info, .shipping-info, .items {
+        .customer-info, .items {
           margin-bottom: 20px;
         }
         
-        .customer-info h2, .shipping-info h2, .items h2 {
+        .customer-info h2, .items h2 {
           color: #333;
           border-bottom: 1px solid #ccc;
           padding-bottom: 5px;
+        }
+        
+        .customer-details {
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+        }
+        
+        .customer-left, .customer-right {
+          flex: 1;
+        }
+        
+        .customer-right {
+          text-align: right;
         }
         
         table {
