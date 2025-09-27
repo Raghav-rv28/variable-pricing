@@ -4,7 +4,6 @@ import {
   AdminPrintAction,
   Banner,
   BlockStack,
-  Checkbox,
   Text,
 } from "@shopify/ui-extensions-react/admin";
 import { useEffect, useState } from "react";
@@ -19,31 +18,16 @@ function App() {
   const {i18n, data} = useApi(TARGET);
   const [src, setSrc] = useState(null);
   
-  // Document selection states
-  const [printInvoice, setPrintInvoice] = useState(true);
-  const [printPackingSlip, setPrintPackingSlip] = useState(false);
-  const [printReceipt, setPrintReceipt] = useState(false);
+  // Invoice is always selected since we only print invoices
+  const [printInvoice] = useState(true);
   
   // data has information about the resource to be printed.
   console.log({ data });
 
-  // Build the print URL based on selected documents and order data
+  // Build the print URL for invoice
   useEffect(() => {
-    const printTypes = [];
-    
-    if (printInvoice) {
-      printTypes.push("Invoice");
-    }
-    if (printPackingSlip) {
-      printTypes.push("Packing Slip");
-    }
-    if (printReceipt) {
-      printTypes.push("Receipt");
-    }
-
-    if (printTypes.length > 0 && data?.selected?.[0]?.id) {
+    if (data?.selected?.[0]?.id) {
       const params = new URLSearchParams({
-        printType: printTypes.join(','),
         orderId: data.selected[0].id
       });
       
@@ -52,7 +36,7 @@ function App() {
     } else {
       setSrc(null);
     }
-  }, [data?.selected, printInvoice, printPackingSlip, printReceipt]);
+  }, [data?.selected]);
 
   return (
     <AdminPrintAction src={src}>
@@ -65,44 +49,8 @@ function App() {
         
         {data?.selected?.[0]?.id && (
           <>
-            <Text fontWeight="bold">Select Documents to Print</Text>
-            <Text>Choose which documents you'd like to print for order {data.selected[0].name || data.selected[0].id}</Text>
-            
-            <Checkbox
-              name="invoice"
-              checked={printInvoice}
-              onChange={(value) => {
-                setPrintInvoice(value);
-              }}
-            >
-              Invoice
-            </Checkbox>
-            
-            <Checkbox
-              name="packing-slip"
-              checked={printPackingSlip}
-              onChange={(value) => {
-                setPrintPackingSlip(value);
-              }}
-            >
-              Packing Slip
-            </Checkbox>
-            
-            <Checkbox
-              name="receipt"
-              checked={printReceipt}
-              onChange={(value) => {
-                setPrintReceipt(value);
-              }}
-            >
-              Receipt
-            </Checkbox>
-            
-            {!printInvoice && !printPackingSlip && !printReceipt && (
-              <Banner tone="warning" title="No Documents Selected">
-                Please select at least one document to print.
-              </Banner>
-            )}
+            <Text fontWeight="bold">Print Invoice</Text>
+            <Text>Click the print button to generate an invoice for order {data.selected[0].name || data.selected[0].id}</Text>
           </>
         )}
       </BlockStack>

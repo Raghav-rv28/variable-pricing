@@ -5,7 +5,6 @@ export async function loader({ request }) {
 
   const url = new URL(request.url);
   const query = url.searchParams;
-  const docs = query.get("printType").split(",");
   const orderId = query.get("orderId");
 
   const response = await admin.graphql(
@@ -13,6 +12,16 @@ export async function loader({ request }) {
       order(id: $orderId) {
         name
         createdAt
+        subtotalPriceSet {
+          shopMoney {
+            amount
+          }
+        }
+        totalTaxSet {
+          shopMoney {
+            amount
+          }
+        }
         totalPriceSet {
           shopMoney {
             amount
@@ -39,9 +48,18 @@ export async function loader({ request }) {
               title
               product {
                 description
+                featuredImage {
+                  url
+                  altText
+                }
               }
               quantity
               originalUnitPriceSet {
+                shopMoney {
+                  amount
+                }
+              }
+              discountedUnitPriceSet {
                 shopMoney {
                   amount
                 }
@@ -60,9 +78,9 @@ export async function loader({ request }) {
 
   const orderData = await response.json();
   const order = orderData.data.order;
- 
-  const pages = docs.map((docType) => orderPage(docType, order));
-  const print = printHTML(pages);
+  
+  const invoice = orderPage(order);
+  const print = printHTML(invoice);
 
   return cors(
     new Response(print, {
@@ -74,31 +92,28 @@ export async function loader({ request }) {
   );
 }
 
-function orderPage(docType, order) {
+function orderPage(order) {
   const orderDate = new Date(order.createdAt).toLocaleDateString();
-  const orderTotal = order.totalPriceSet.shopMoney.amount;
+  const subtotal = parseFloat(order.subtotalPriceSet.shopMoney.amount);
+  const taxes = parseFloat(order.totalTaxSet.shopMoney.amount);
+  const total = parseFloat(order.totalPriceSet.shopMoney.amount);
   
-  // Customize content based on document type
-  let headerTitle = docType;
-  let showShippingInfo = true;
-  let showItems = true;
-  
-  if (docType === "Receipt") {
-    headerTitle = "Receipt";
-    showShippingInfo = false; // Receipts typically don't show shipping
-  } else if (docType === "Packing Slip") {
-    headerTitle = "Packing Slip";
-    showItems = true; // Packing slips focus on items
-  }
+  // Company logo URL - replace with your actual logo URL
+  const companyLogoUrl = "YOUR_COMPANY_LOGO_URL_HERE";
   
   let content = `
     <div class="page">
       <div class="header">
-        <h1>${headerTitle}</h1>
+        <div class="company-info">
+          ${companyLogoUrl !== "YOUR_COMPANY_LOGO_URL_HERE" ? 
+            `<img src="${companyLogoUrl}" alt="Company Logo" class="company-logo" />` : 
+            '<div class="company-logo-placeholder">Company Logo</div>'
+          }
+        </div>
+        <h1>Invoice</h1>
         <div class="order-info">
           <p><strong>Order:</strong> ${order.name}</p>
           <p><strong>Date:</strong> ${orderDate}</p>
-          <p><strong>Total:</strong> $${orderTotal}</p>
         </div>
       </div>
       
@@ -108,7 +123,6 @@ function orderPage(docType, order) {
         <p><strong>Email:</strong> ${order.customer?.email || ''}</p>
       </div>
       
-      ${showShippingInfo ? `
       <div class="shipping-info">
         <h2>Shipping Address</h2>
         <p>${order.shippingAddress?.firstName || ''} ${order.shippingAddress?.lastName || ''}</p>
@@ -117,41 +131,61 @@ function orderPage(docType, order) {
         <p>${order.shippingAddress?.city || ''}, ${order.shippingAddress?.province || ''} ${order.shippingAddress?.zip || ''}</p>
         <p>${order.shippingAddress?.country || ''}</p>
       </div>
-      ` : ''}
       
-      ${showItems ? `
       <div class="items">
         <h2>Items</h2>
         <table>
           <thead>
             <tr>
+              <th>Image</th>
               <th>Item</th>
               <th>Quantity</th>
-              <th>Price</th>
+              <th>Unit Price</th>
+              <th>Total</th>
               <th>Description</th>
             </tr>
           </thead>
           <tbody>
-  ` : ''}
-  
-  ${showItems ? order.lineItems.edges.map(edge => {
+  ${order.lineItems.edges.map(edge => {
     const item = edge.node;
-    const price = item.originalUnitPriceSet.shopMoney.amount;
+    const unitPrice = parseFloat(item.originalUnitPriceSet.shopMoney.amount);
+    const totalPrice = unitPrice * item.quantity;
+    const productImage = item.product.featuredImage;
+    
     return `
       <tr>
+        <td class="product-image-cell">
+          ${productImage?.url ? 
+            `<img src="${productImage.url}" alt="${productImage.altText || item.title}" class="product-image" />` : 
+            '<div class="no-image">No Image</div>'
+          }
+        </td>
         <td>${item.title}</td>
         <td>${item.quantity}</td>
-        <td>$${price}</td>
+        <td>$${unitPrice.toFixed(2)}</td>
+        <td>$${totalPrice.toFixed(2)}</td>
         <td>${item.product.description || ''}</td>
       </tr>
     `;
-  }).join('') : ''}
-  
-  ${showItems ? `
+  }).join('')}
           </tbody>
         </table>
       </div>
-      ` : ''}
+      
+      <div class="totals">
+        <div class="totals-row">
+          <span class="label">Subtotal:</span>
+          <span class="amount">$${subtotal.toFixed(2)}</span>
+        </div>
+        <div class="totals-row">
+          <span class="label">Taxes:</span>
+          <span class="amount">$${taxes.toFixed(2)}</span>
+        </div>
+        <div class="totals-row total-row">
+          <span class="label">Total:</span>
+          <span class="amount">$${total.toFixed(2)}</span>
+        </div>
+      </div>
       
       <div class="footer">
         <p>Thank you for your business!</p>
@@ -162,13 +196,13 @@ function orderPage(docType, order) {
   return content;
 }
 
-function printHTML(pages) {
+function printHTML(invoice) {
   return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
-      <title>Print Documents</title>
+      <title>Invoice</title>
       <style>
         body {
           font-family: Arial, sans-serif;
@@ -195,9 +229,32 @@ function printHTML(pages) {
           margin-bottom: 20px;
         }
         
+        .company-info {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        
+        .company-logo {
+          max-height: 80px;
+          max-width: 200px;
+        }
+        
+        .company-logo-placeholder {
+          height: 60px;
+          width: 200px;
+          border: 2px dashed #ccc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin: 0 auto;
+          color: #666;
+          font-size: 14px;
+        }
+        
         .header h1 {
           margin: 0 0 10px 0;
           color: #333;
+          text-align: center;
         }
         
         .order-info {
@@ -236,6 +293,61 @@ function printHTML(pages) {
           font-weight: bold;
         }
         
+        .product-image-cell {
+          width: 80px;
+          text-align: center;
+        }
+        
+        .product-image {
+          width: 60px;
+          height: 60px;
+          object-fit: cover;
+          border-radius: 4px;
+        }
+        
+        .no-image {
+          width: 60px;
+          height: 60px;
+          background-color: #f5f5f5;
+          border: 1px dashed #ccc;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 10px;
+          color: #666;
+          border-radius: 4px;
+        }
+        
+        .totals {
+          margin-top: 20px;
+          border-top: 2px solid #333;
+          padding-top: 15px;
+        }
+        
+        .totals-row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 8px;
+          font-size: 14px;
+        }
+        
+        .total-row {
+          font-weight: bold;
+          font-size: 16px;
+          border-top: 1px solid #ddd;
+          padding-top: 8px;
+          margin-top: 8px;
+        }
+        
+        .label {
+          text-align: left;
+        }
+        
+        .amount {
+          text-align: right;
+          font-weight: bold;
+        }
+        
         .footer {
           margin-top: 30px;
           text-align: center;
@@ -258,7 +370,7 @@ function printHTML(pages) {
       </style>
     </head>
     <body>
-      ${pages.join('')}
+      ${invoice}
     </body>
     </html>
   `;
