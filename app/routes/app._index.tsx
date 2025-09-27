@@ -44,11 +44,11 @@ const GET_COLLECTIONS = `#graphql
 `;
 
 const GET_COLLECTION_PRODUCTS = `#graphql
-  query getCollectionProducts($collectionId: ID!, $first: Int!) {
+  query getCollectionProducts($collectionId: ID!, $first: Int!, $after: String) {
     collection(id: $collectionId) {
       id
       title
-      products(first: $first) {
+      products(first: $first, after: $after) {
         edges {
           node {
             id
@@ -80,6 +80,11 @@ const GET_COLLECTION_PRODUCTS = `#graphql
               }
             }
           }
+          cursor
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
         }
       }
     }
@@ -151,21 +156,75 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       }
 
       try {
-        const response = await admin.graphql(GET_COLLECTION_PRODUCTS, {
-          variables: { 
-            collectionId, 
-            first: 100
-          }
-        });
-        const data = await response.json();
+        // Fetch all products using cursor-based pagination
+        let allEdges: any[] = [];
+        let hasNextPage = true;
+        let endCursor: string | null = null;
+        let pageCount = 0;
+        const pageSize = 100; // Fetch 100 products per page
 
-        if (!data?.data?.collection) {
-          console.error("[Action:getProducts] No collection in response", data);
+        console.log(`[Action:getProducts] Starting pagination to fetch all products...`);
+
+        while (hasNextPage) {
+          pageCount++;
+          console.log(`[Action:getProducts] Fetching page ${pageCount}${endCursor ? ` (after cursor: ${endCursor.substring(0, 20)}...)` : ''}`);
+
+          const response: any = await admin.graphql(GET_COLLECTION_PRODUCTS, {
+            variables: { 
+              collectionId, 
+              first: pageSize,
+              after: endCursor
+            }
+          });
+          
+          const data: any = await response.json();
+
+          if (!data?.data?.collection) {
+            console.error("[Action:getProducts] No collection in response", data);
+            break;
+          }
+
+          const pageEdges = data.data?.collection?.products?.edges || [];
+          const pageInfo: any = data.data?.collection?.products?.pageInfo;
+          
+          allEdges = allEdges.concat(pageEdges);
+          hasNextPage = pageInfo?.hasNextPage || false;
+          endCursor = pageInfo?.endCursor || null;
+
+          console.log(`[Action:getProducts] Page ${pageCount}: fetched ${pageEdges.length} products, total so far: ${allEdges.length}`);
+          
+          // Safety check to prevent infinite loops
+          if (pageCount > 50) {
+            console.warn(`[Action:getProducts] Stopping pagination after 50 pages (${allEdges.length} products) to prevent infinite loop`);
+            break;
+          }
         }
 
-        const edges = data.data?.collection?.products?.edges || [];
-        console.log(`[Action:getProducts] searchQuery='${searchQuery}', products=${edges.length}`);
-        return { products: edges, action: "getProducts" };
+        console.log(`[Action:getProducts] Pagination complete: ${pageCount} pages, ${allEdges.length} total products`);
+        console.log(`[Action:getProducts] searchQuery='${searchQuery}', final products=${allEdges.length}`);
+        
+        // Log detailed product information
+        const productsWithWeight = allEdges.filter((edge: any) => 
+          edge.node.variants.edges.some((variantEdge: any) => 
+            variantEdge.node.inventoryItem?.measurement?.weight?.value > 0
+          )
+        );
+        const productsWithoutWeight = allEdges.filter((edge: any) => 
+          !edge.node.variants.edges.some((variantEdge: any) => 
+            variantEdge.node.inventoryItem?.measurement?.weight?.value > 0
+          )
+        );
+        
+        console.log(`[Action:getProducts] Total products: ${allEdges.length}`);
+        console.log(`[Action:getProducts] Products with weight: ${productsWithWeight.length}`);
+        console.log(`[Action:getProducts] Products without weight: ${productsWithoutWeight.length}`);
+        
+        // Log first few product titles for debugging
+        console.log(`[Action:getProducts] First 5 product titles:`, 
+          allEdges.slice(0, 5).map((edge: any) => edge.node.title)
+        );
+        
+        return { products: allEdges, action: "getProducts" };
       } catch (err) {
         console.error("[Action:getProducts] Error fetching products:", err);
         return { products: [], errors: [String(err)], action: "getProducts" };
@@ -334,6 +393,29 @@ export default function Index() {
         )
       }));
       console.log(`[Client] Received products: ${productData.length}`);
+      
+      // Log detailed client-side product analysis
+      const productsWithWeight = productData.filter((p: any) => p.hasWeight);
+      const productsWithoutWeight = productData.filter((p: any) => !p.hasWeight);
+      const activeProducts = productData.filter((p: any) => p.status === 'ACTIVE');
+      const draftProducts = productData.filter((p: any) => p.status === 'DRAFT');
+      const archivedProducts = productData.filter((p: any) => p.status === 'ARCHIVED');
+      
+      console.log(`[Client] Product breakdown:`);
+      console.log(`  - Total products: ${productData.length}`);
+      console.log(`  - Products with weight: ${productsWithWeight.length}`);
+      console.log(`  - Products without weight: ${productsWithoutWeight.length}`);
+      console.log(`  - Active products: ${activeProducts.length}`);
+      console.log(`  - Draft products: ${draftProducts.length}`);
+      console.log(`  - Archived products: ${archivedProducts.length}`);
+      
+      // Summary log
+      console.log(`[Client] === PRODUCT LOADING SUMMARY ===`);
+      console.log(`[Client] Collection loaded with ${productData.length} products`);
+      console.log(`[Client] ${productsWithWeight.length} products have weight data and can be priced`);
+      console.log(`[Client] ${productsWithoutWeight.length} products missing weight data`);
+      console.log(`[Client] ================================`);
+      
       setProducts(productData);
       setSelectedProducts(new Set());
       setSelectAll(false);
@@ -385,6 +467,12 @@ useEffect(() => {
     return true;
   });
 
+  // Log filtering results
+  console.log(`[Client] Filtering results:`);
+  console.log(`  - Original products: ${products.length}`);
+  console.log(`  - After status filter: ${filteredProducts.length}`);
+  console.log(`  - Status filter applied: ${statusFilter.length > 0 ? statusFilter.join(', ') : 'none'}`);
+
   // Sorting logic for table columns: Weight (2), Price (3), Modifier (4)
   // Apply sorting to all filtered products before pagination
   const sortedProducts = (() => {
@@ -412,6 +500,15 @@ useEffect(() => {
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedProducts = sortedProducts.slice(startIndex, endIndex);
+
+  // Log pagination results
+  console.log(`[Client] Pagination results:`);
+  console.log(`  - Sorted products: ${sortedProducts.length}`);
+  console.log(`  - Total pages: ${totalPages}`);
+  console.log(`  - Current page: ${currentPage}`);
+  console.log(`  - Page size: ${pageSize}`);
+  console.log(`  - Products on current page: ${paginatedProducts.length}`);
+  console.log(`  - Showing products ${startIndex + 1} to ${Math.min(endIndex, sortedProducts.length)} of ${sortedProducts.length}`);
 
   const handleProductSelect = (productId: string, checked: boolean) => {
     console.log(`[Client] Product select ${checked ? 'on' : 'off'}:`, productId);
@@ -747,6 +844,11 @@ useEffect(() => {
                     </InlineStack>
                     <Text variant="bodyMd" as="p">
                       {selectedProducts.size} of {sortedProducts.length} products selected
+                      {sortedProducts.length !== products.length && (
+                        <span style={{ color: '#666', fontSize: '0.9em' }}>
+                          {' '}({products.length} total in collection)
+                        </span>
+                      )}
                     </Text>
                   </InlineStack>
 
