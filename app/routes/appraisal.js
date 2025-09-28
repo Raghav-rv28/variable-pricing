@@ -259,7 +259,7 @@ function appraisalPage(order) {
       </div>
       
       <div class="footer">
-        <p><strong>This appraisal is valid for 30 days from the date of issue.</strong></p>
+        <p><strong>Thank you for your business!</strong></p>
         <p>For questions regarding this appraisal, please contact us at ${businessInfo.phone}</p>
       </div>
     </div>
