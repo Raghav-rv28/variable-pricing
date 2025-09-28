@@ -118,7 +118,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   
     // Get collections for the dropdown
     const collectionsResponse = await admin.graphql(GET_COLLECTIONS, {
-      variables: { first: 50 }
+      variables: { first: 100 }
     });
     const collectionsData = await collectionsResponse.json();
 
