@@ -334,7 +334,7 @@ function generateAppraisalPage(order) {
               <th>Image</th>
               <th>Item Name</th>
               <th>Weight (grams)</th>
-              <th>Quantity</th>
+              <th>Description</th>
               <th>Unit Price</th>
               <th>Total Value</th>
             </tr>
@@ -360,7 +360,7 @@ function generateAppraisalPage(order) {
         </td>
         <td>${item.title}</td>
         <td>${weight}</td>
-        <td>${item.quantity}</td>
+        <td>${item.product.description}</td>
         <td>$${unitPrice.toFixed(2)}</td>
         <td>$${totalPrice.toFixed(2)}</td>
       </tr>
