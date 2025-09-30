@@ -214,7 +214,7 @@ function generateInvoicePage(order) {
           }
         </td>
         <td>${item.title}</td>
-        <td>${item.description}</td>
+        <td>${item.product.description}</td>
         <td>$${unitPrice.toFixed(2)}</td>
         <td>$${totalPrice.toFixed(2)}</td>
       </tr>
