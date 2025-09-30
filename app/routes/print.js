@@ -193,7 +193,7 @@ function generateInvoicePage(order) {
             <tr>
               <th>Image</th>
               <th>Item</th>
-              <th>Quantity</th>
+              <th>Description</th>
               <th>Unit Price</th>
               <th>Total</th>
             </tr>
@@ -214,7 +214,7 @@ function generateInvoicePage(order) {
           }
         </td>
         <td>${item.title}</td>
-        <td>${item.quantity}</td>
+        <td>${item.description}</td>
         <td>$${unitPrice.toFixed(2)}</td>
         <td>$${totalPrice.toFixed(2)}</td>
       </tr>
@@ -334,7 +334,7 @@ function generateAppraisalPage(order) {
               <th>Image</th>
               <th>Item Name</th>
               <th>Weight (grams)</th>
-              <th>Description</th>
+              <th>Quantity</th>
               <th>Unit Price</th>
               <th>Total Value</th>
             </tr>
@@ -360,7 +360,7 @@ function generateAppraisalPage(order) {
         </td>
         <td>${item.title}</td>
         <td>${weight}</td>
-        <td>${item.product.description}</td>
+        <td>${item.quantity}</td>
         <td>$${unitPrice.toFixed(2)}</td>
         <td>$${totalPrice.toFixed(2)}</td>
       </tr>
