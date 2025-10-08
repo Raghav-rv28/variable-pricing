@@ -240,9 +240,18 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     if (actionType === "updatePrices") {
       const selectedProducts = JSON.parse(formData.get("selectedProducts") as string);
-      const multiplier = parseFloat(formData.get("multiplier") as string);
-
-      console.log(`[Action:updatePrices] products=${selectedProducts?.length || 0}, multiplier=${multiplier}`);
+      const pricingMode = formData.get("pricingMode") as string;
+      
+      let multiplier: number;
+      let weightTiers: any[] = [];
+      
+      if (pricingMode === 'simple') {
+        multiplier = parseFloat(formData.get("multiplier") as string);
+        console.log(`[Action:updatePrices] Simple mode - products=${selectedProducts?.length || 0}, multiplier=${multiplier}`);
+      } else {
+        weightTiers = JSON.parse(formData.get("weightTiers") as string);
+        console.log(`[Action:updatePrices] Tiered mode - products=${selectedProducts?.length || 0}, tiers=${weightTiers.length}`);
+      }
       
       const results: any[] = [];
       const errors: string[] = [];
@@ -256,12 +265,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             })
             .map((variant: any) => {
               const weight = variant.inventoryItem.measurement.weight.value;
-              const newPrice = (parseFloat(weight) * multiplier).toFixed(2);
+              let newPrice: string;
+              
+              if (pricingMode === 'simple') {
+                newPrice = (parseFloat(weight) * multiplier).toFixed(2);
+              } else {
+                // Find the first matching tier
+                const matchingTier = weightTiers.find((tier: any) => {
+                  if (tier.operator === 'lt') {
+                    return weight < tier.weight;
+                  } else { // 'gte'
+                    return weight >= tier.weight;
+                  }
+                });
+                
+                if (matchingTier) {
+                  newPrice = (parseFloat(weight) * matchingTier.multiplier).toFixed(2);
+                } else {
+                  // Skip this variant if no tier matches
+                  return null;
+                }
+              }
+              
               return {
                 id: variant.id,
                 price: newPrice
               };
-            });
+            })
+            .filter((variant: any) => variant !== null); // Remove null entries
 
           console.log(`[Action:updatePrices] '${product.title}' variantsToUpdate=${variantsToUpdate.length}`);
 
@@ -327,6 +358,16 @@ export default function Index() {
   const [hoveredProductId, setHoveredProductId] = useState<string | null>(null);
   const [sortedColumnIndex, setSortedColumnIndex] = useState<number | undefined>(undefined);
   const [sortDirection, setSortDirection] = useState<'ascending' | 'descending' | 'none'>('none');
+  
+  // New state for tiered pricing and keyword exclusion
+  const [pricingMode, setPricingMode] = useState<'simple' | 'tiered'>('simple');
+  const [weightTiers, setWeightTiers] = useState([
+    { operator: 'gte', weight: 0, multiplier: 0 },
+    { operator: 'gte', weight: 2, multiplier: 0 },
+    { operator: 'gte', weight: 5, multiplier: 0 },
+    { operator: 'gte', weight: 10, multiplier: 0 },
+  ]);
+  const [excludeKeywords, setExcludeKeywords] = useState<string[]>([]);
 
   const isLoadingProducts = fetcher.state === "submitting" && 
     fetcher.formData?.get("actionType") === "getProducts";
@@ -360,6 +401,15 @@ export default function Index() {
     setHoveredProductId(null);
     setSortedColumnIndex(undefined);
     setSortDirection('none');
+    // Reset new state
+    setPricingMode('simple');
+    setWeightTiers([
+      { operator: 'gte', weight: 0, multiplier: 0 },
+      { operator: 'gte', weight: 2, multiplier: 0 },
+      { operator: 'gte', weight: 5, multiplier: 0 },
+      { operator: 'gte', weight: 10, multiplier: 0 },
+    ]);
+    setExcludeKeywords([]);
   };
 
   // Client diagnostics
@@ -478,6 +528,17 @@ useEffect(() => {
       return false;
     }
     
+    // Keyword exclusion filter
+    if (excludeKeywords.length > 0) {
+      const title = product.title.toLowerCase();
+      const hasExcludedKeyword = excludeKeywords.some(keyword => 
+        title.includes(keyword.toLowerCase())
+      );
+      if (hasExcludedKeyword) {
+        return false;
+      }
+    }
+    
     // Search filter (live search on title and product ID)
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
@@ -591,11 +652,21 @@ useEffect(() => {
   };
 
   const handleUpdatePrices = () => {
-    console.log("[Client] handleUpdatePrices clicked. selected=", selectedProducts.size, "multiplier=", multiplier);
-    if (!multiplier || isNaN(parseFloat(multiplier))) {
-      setMessage("Please enter a valid multiplier");
-      return;
+    console.log("[Client] handleUpdatePrices clicked. selected=", selectedProducts.size, "pricingMode=", pricingMode);
+    
+    // Validation based on pricing mode
+    if (pricingMode === 'simple') {
+      if (!multiplier || isNaN(parseFloat(multiplier))) {
+        setMessage("Please enter a valid multiplier");
+        return;
+      }
+    } else {
+      if (weightTiers.some(tier => tier.multiplier <= 0)) {
+        setMessage("Please set valid multipliers for all tiers");
+        return;
+      }
     }
+    
     if (selectedProducts.size === 0) {
       setMessage("Please select at least one product");
       return;
@@ -605,9 +676,15 @@ useEffect(() => {
     const formData = new FormData();
     formData.append("actionType", "updatePrices");
     formData.append("selectedProducts", JSON.stringify(selectedProductData));
-    formData.append("multiplier", multiplier);
+    formData.append("pricingMode", pricingMode);
+    
+    if (pricingMode === 'simple') {
+      formData.append("multiplier", multiplier);
+    } else {
+      formData.append("weightTiers", JSON.stringify(weightTiers));
+    }
 
-    console.log(`[Client] Submitting updatePrices for products=${selectedProductData.length}`);
+    console.log(`[Client] Submitting updatePrices for products=${selectedProductData.length}, mode=${pricingMode}`);
     fetcher.submit(formData, { method: "POST" });
   };
 
@@ -692,6 +769,7 @@ useEffect(() => {
   const clearFilters = () => {
     setSearchQuery("");
     setStatusFilter([]);
+    setExcludeKeywords([]);
   };
 
   const filters = [
@@ -714,13 +792,43 @@ useEffect(() => {
       ),
       shortcut: true,
     },
+    {
+      key: 'excludeKeywords',
+      label: 'Exclude Keywords',
+      filter: (
+        <ChoiceList
+          title="Exclude Keywords"
+          titleHidden
+          choices={[
+            { label: '10k', value: '10k' },
+            { label: '14k', value: '14k' },
+            { label: '18k', value: '18k' },
+            { label: '21k', value: '21k' },
+            { label: '22k', value: '22k' },
+            { label: 'Silver', value: 'Silver' },
+            { label: 'Diamond', value: 'Diamond' },
+          ]}
+          selected={excludeKeywords}
+          onChange={setExcludeKeywords}
+          allowMultiple
+        />
+      ),
+      shortcut: true,
+    },
   ];
 
-  const appliedFilters = statusFilter.map(status => ({
-    key: `status-${status}`,
-    label: `Status: ${status}`,
-    onRemove: () => setStatusFilter(statusFilter.filter(s => s !== status)),
-  }));
+  const appliedFilters = [
+    ...statusFilter.map(status => ({
+      key: `status-${status}`,
+      label: `Status: ${status}`,
+      onRemove: () => setStatusFilter(statusFilter.filter(s => s !== status)),
+    })),
+    ...excludeKeywords.map(keyword => ({
+      key: `exclude-${keyword}`,
+      label: `Exclude: ${keyword}`,
+      onRemove: () => setExcludeKeywords(excludeKeywords.filter(k => k !== keyword)),
+    })),
+  ];
 
   // Show login form if not authenticated
   if (!isAuthenticated) {
@@ -809,29 +917,108 @@ useEffect(() => {
                 />
               </Box>
               
-              <Box minWidth="150px">
-                <TextField
-                  label="Multiplier"
-                  value={multiplier}
-                  onChange={setMultiplier}
-                  type="number"
-                  autoComplete=""
-                  step={0.01}
-                  placeholder="e.g., 2.5"
+              <Box minWidth="120px">
+                <Select
+                  label="Pricing Mode"
+                  options={[
+                    { label: "Simple Multiplier", value: "simple" },
+                    { label: "Tiered Pricing", value: "tiered" }
+                  ]}
+                  value={pricingMode}
+                  onChange={(value) => setPricingMode(value as 'simple' | 'tiered')}
                 />
               </Box>
+              
+              {pricingMode === 'simple' && (
+                <Box minWidth="150px">
+                  <TextField
+                    label="Multiplier"
+                    value={multiplier}
+                    onChange={setMultiplier}
+                    type="number"
+                    autoComplete=""
+                    step={0.01}
+                    placeholder="e.g., 2.5"
+                  />
+                </Box>
+              )}
               
               <Box paddingBlockStart="600">
                 <Button
                   variant="primary"
                   onClick={handleUpdatePrices}
-                  disabled={!selectedCollection || !multiplier || selectedProducts.size === 0 || isUpdatingPrices}
+                  disabled={!selectedCollection || (pricingMode === 'simple' ? !multiplier : weightTiers.some(tier => tier.multiplier <= 0)) || selectedProducts.size === 0 || isUpdatingPrices}
                   loading={isUpdatingPrices}
                 >
                   Update Prices ({selectedProducts.size.toLocaleString()} selected)
                 </Button>
               </Box>
             </InlineStack>
+
+            {pricingMode === 'tiered' && (
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h3" variant="headingMd">
+                    Weight-Based Pricing Tiers
+                  </Text>
+                  <Text variant="bodyMd" as="p">
+                    Set different multipliers based on product weight. Products will use the first matching tier.
+                  </Text>
+                  
+                  {weightTiers.map((tier, index) => (
+                    <InlineStack key={index} gap="300" align="start">
+                      <Box minWidth="100px">
+                        <Select
+                          label={`Tier ${index + 1} Operator`}
+                          options={[
+                            { label: "Less than (<)", value: "lt" },
+                            { label: "Greater than or equal (≥)", value: "gte" }
+                          ]}
+                          value={tier.operator}
+                          onChange={(value) => {
+                            const newTiers = [...weightTiers];
+                            newTiers[index].operator = value as 'lt' | 'gte';
+                            setWeightTiers(newTiers);
+                          }}
+                        />
+                      </Box>
+                      
+                      <Box minWidth="100px">
+                        <TextField
+                          label={`Weight (grams)`}
+                          value={tier.weight.toString()}
+                          onChange={(value) => {
+                            const newTiers = [...weightTiers];
+                            newTiers[index].weight = parseFloat(value) || 0;
+                            setWeightTiers(newTiers);
+                          }}
+                          type="number"
+                          step={0.1}
+                          placeholder="0"
+                          autoComplete=""
+                        />
+                      </Box>
+                      
+                      <Box minWidth="100px">
+                        <TextField
+                          label={`Multiplier`}
+                          value={tier.multiplier.toString()}
+                          onChange={(value) => {
+                            const newTiers = [...weightTiers];
+                            newTiers[index].multiplier = parseFloat(value) || 0;
+                            setWeightTiers(newTiers);
+                          }}
+                          type="number"
+                          step={0.01}
+                          placeholder="0.00"
+                          autoComplete=""
+                        />
+                      </Box>
+                    </InlineStack>
+                  ))}
+                </BlockStack>
+              </Card>
+            )}
 
             {message && (
               <Banner>
