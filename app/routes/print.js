@@ -552,9 +552,13 @@ function printHTML(content) {
         .page {
           margin-bottom: 30px;
           page-break-after: always;
-          border: 1px solid #ddd;
           padding: 20px;
           min-height: 800px;
+          position: relative;
+          background-image: url('https://cdn.shopify.com/s/files/1/0736/0882/3069/files/2.png?v=1760030253');
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
         }
         
         .page:last-child {
@@ -823,9 +827,15 @@ function printHTML(content) {
           }
           
           .page {
-            border: none;
             margin: 0;
             padding: 20px;
+            background-image: url('https://cdn.shopify.com/s/files/1/0736/0882/3069/files/2.png?v=1760030253');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+            color-adjust: exact;
           }
           
           .condition-checkboxes input[type="checkbox"] {
