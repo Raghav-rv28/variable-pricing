@@ -57,24 +57,19 @@ const MESSAGE_TEMPLATES = [
     id: 'thank-you',
     label: 'Order confirmation',
     buildMessage: ({customerFirstName, orderName, addressLine1, addressLine2, city, state, zip, country, email, phone}: MessageContext) =>
-      `Hi ${customerFirstName}, thank you for your order ${orderName}. We are reaching out to you to confirm your details before we ship your order. if you can please confirm the details below. \n\nAddress: ${addressLine1} ${addressLine2} ${city} ${state} ${zip} ${country} \n\n and Contact Information: \n ${email} \n ${phone} \n\n Once confirmed, we will share the video of the product(s) you have ordered and then they will be shipped to you. \n
-     `
+      `Hi ${customerFirstName}, thank you for your order ${orderName}. We are reaching out to you to confirm your details before we ship your order. if you can please confirm the details below.\n\nAddress: ${addressLine1} ${addressLine2} ${city} ${state} ${zip} ${country}\n\nand Contact Information:\n${email}\n${phone}\n\nOnce confirmed, we will share the video of the product(s) you have ordered and then they will be shipped to you.`
   },
   {
     id: 'verification-required',
     label: 'Verification required',
     buildMessage: ({orderName}: MessageContext) =>
-      `Your order ${orderName} has been flagged for verification. Please send us a picture of your ID holding it in your hand. like shown in the link below. \n https://www.dubaijewellers.com/policies/terms-of-service
-     `
+      `Your order ${orderName} has been flagged for verification. Please send us a picture of your ID holding it in your hand, like shown in the link below.\nhttps://www.dubaijewellers.com/policies/terms-of-service`
   },
   {
     id: "pickup-verification",
     label: 'Pickup verification',
     buildMessage: ({customerFirstName, orderName}: MessageContext) =>
-      `Hi, ${customerFirstName}, your order ${orderName} is ready for pickup. Please let us know when you plan to collect it.
-    \n please bring your ID with you for pickup, otherwise we will not be able to process your pickup. \n
-    if you have any questions, please let us know.
-     `
+      `Hi, ${customerFirstName}, your order ${orderName} is ready for pickup. Please let us know when you plan to collect it.\n\nPlease bring your ID with you for pickup, otherwise we will not be able to process your pickup.\n\nIf you have any questions, please let us know.`
   }
 ];
 
