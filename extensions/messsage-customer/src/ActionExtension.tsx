@@ -57,7 +57,7 @@ const MESSAGE_TEMPLATES = [
     id: 'thank-you',
     label: 'Order confirmation',
     buildMessage: ({customerFirstName, orderName, addressLine1, addressLine2, city, state, zip, country, email, phone}: MessageContext) =>
-      `Hi ${customerFirstName}, thank you for your order ${orderName}. We are reaching out to you to confirm your details before we ship your order. if you can please confirm the details below.\n\nAddress: ${addressLine1} ${addressLine2} ${city} ${state} ${zip} ${country}\n\nand Contact Information:\n${email}\n${phone}\n\nOnce confirmed, we will share the video of the product(s) you have ordered and then they will be shipped to you.`
+      `Hi ${customerFirstName}, thank you for your order ${orderName}. We are reaching out to you to confirm your details before we ship your order. if you can please confirm the details below.\n\nAddress: ${addressLine1} ${addressLine2 ? `, ${addressLine2}` : ''} ${city} ${state} ${zip} ${country}\n\nand Contact Information:\n${email}\n${phone}\n\nOnce confirmed, we will share the video of the product(s) you have ordered and then they will be shipped to you.`
   },
   {
     id: 'verification-required',
@@ -75,7 +75,7 @@ const MESSAGE_TEMPLATES = [
 
 type MessageContext = {
   customerFirstName: string;
-  orderName: string;
+  orderName: string; 
   addressLine1: string | null;
   addressLine2: string | null;
   city: string | null;
