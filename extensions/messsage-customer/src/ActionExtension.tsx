@@ -63,7 +63,7 @@ const MESSAGE_TEMPLATES = [
     id: 'verification-required',
     label: 'Verification required',
     buildMessage: ({orderName}: MessageContext) =>
-      `Your order ${orderName} has been flagged for verification. Please send us a picture of your ID holding it in your hand, like shown in the link below.\nhttps://www.dubaijewellers.com/policies/terms-of-service`
+      `Your order ${orderName} has been flagged for verification. Please send us a picture of your ID holding it in your hand, like shown in the link below.\nhttps://www.dubaijewellers.ca/policies/terms-of-service`
   },
   {
     id: "pickup-verification",
